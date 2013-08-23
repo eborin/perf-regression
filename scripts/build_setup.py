@@ -115,13 +115,10 @@ def make(bldri_d,install=False):
 # Main -- used for tests. The ideal usage is to import this module and use the
 # function retrieve directly.
 def usage():
-	print "\nUsage: build_setup.py -s srcdir -n srcbasename [-v srcver] [-m] -c bldcfg_fn [-h]\n"
+	print "\nUsage: build_setup.py -s srcdir -b bldcfg_fn [-h]\n"
 	print "\nARGUMENTS"
 	print "\t-s srcdir     : souce code directory."
-	print "\t-n srcbasename: souce code base name."
-	print "\t-v srcver     : source code version."
-	print "\t-m            : source code is modified (not a clean copy)."
-	print "\t-c bldcfg_fn  : build configuration file name."
+	print "\t-b bldcfg_fn  : build configuration file name."
 	print "\t-h            : help ."
 	print "\nDESCRIPTION"
 	print "\tTODO....."
@@ -136,22 +133,22 @@ if __name__ == "__main__":
 	srcver=0
 	srcmodified=False
 	bldcfg_fn=0
-	opts, extra_args = getopt.getopt(sys.argv[1:], 's:n:v:c:mh')
+	opts, extra_args = getopt.getopt(sys.argv[1:], 's:b:h')
 	for f, v in opts:
-		if f == '-s'  : srcdir=v
-		elif f == '-n': srcbasename=v
-		elif f == '-v': srcver=v
-		elif f == '-m': srcmodified=True
-		elif f == '-c': bldcfg_fn=v
+		if f   == '-s': srcdir=v
+		elif f == '-b': bldcfg_fn=v
 		elif f == '-h': usage()
 	
 	if bldcfg_fn == 0:
-		error("An input build configuration file must be provided (-c).", 1)
+		error("An input build configuration file must be provided (-b).", 1)
 	
-	bldcfg = cfg_file.read(bldcfg_fn)
+	bldcfgd = cfg_file.read(bldcfg_fn)
+
+	srcri_fn = os.path.join(srcdir,"regression.cfg")
+
+	srcri = cfg_file.read(srcri_fn)
 	
-	status,blddir,insdir = configure(srcdir,srcbasename,srcver,srcmodified,bldcfg)
+	status,rid = configure(srcri,bldcfgd)
 	
 	print "STATUS : ", status
-	print "BLDDIR : ", blddir
-	print "INSDIR : ", insdir
+	print "RID    : ", rid

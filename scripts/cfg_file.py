@@ -43,7 +43,7 @@ def error(message, status):
 def read(filename):
 	# Check configuration file
 	if not os.path.isfile(filename): 
-		error(filename+' is not a valid application configuration file.\n', 1)
+		error(filename+' is not a valid configuration file.\n', 1)
 	d={}
 	with open(filename) as f:
 		for line in f:
@@ -100,7 +100,7 @@ def prnt(cfgdct):
 # Get one of the fields out of a configuration dictionary
 def getfld(d,fld):
 	if fld not in d:
-		error("Application configuration file does not contain field \""+fld+"\"", 1)
+		error("Configuration file does not contain field \""+fld+"\"", 1)
 	return d[fld]
 
 # Functions for stand alone tests
