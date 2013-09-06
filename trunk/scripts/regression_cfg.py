@@ -18,9 +18,9 @@
 #*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
 #**************************************************************************/
 
-basedir="/Users/borin/Desktop/perf-regression/"
+basedir="/local/borin/perf-regression/"
 
-extra_make_args="-j 4"
+extra_make_args="-j 64"
 
 import os.path
 import cfg_file
