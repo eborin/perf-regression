@@ -163,11 +163,10 @@ if ss_status != 0 :
 
 # Configure the build directory
 verbose("Configuring build directory")
-bs_status, bldri_d=build_setup.configure(srcri_d,bldcfg)
-
-# Check for errors
-if bs_status != 0 : 
-    fatal("Error when configure the build directory build_setup.configure(...) returned error code "+str(bs_status)+".")
+try:
+	bldri_d=build_setup.configure(srcri_d,bldcfg)
+except BuildSetupError, e:
+       	fatal("Error when configuring the build directory. "+str(e))
 
 # Make the build directory
 verbose("Building the application")
