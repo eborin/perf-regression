@@ -21,42 +21,54 @@
 import regression_cfg
 import sys
 import os.path
+import shutil
 import cfg_file
 import subprocess as sp
 
-def error(message, status):
-	sys.stderr.write('ERROR (build_setup): '+message+'\n')
-        sys.exit(status)
-
-def fatal(message):
-	sys.stderr.write('FATAL (build_setup): '+message+'\n')
-        sys.exit(1)
+class BuildSetupError(Exception):
+	def __init__(self, msg):
+		self.msg = msg
+	def __str__(self):
+		return self.msg
 
 def warn(message):
 	sys.stderr.write('WARNING (build_setup): '+message+'\n')
 
 # TODO: Describe the function!!!
-def configure(srcri_d,bldcfg):
+def configure(srcri_d,bldcfg,remove_existing_build_dir=False):
 	# Check src directories
 	srcdir=cfg_file.getfld(srcri_d,"srcdir")
 	if not os.path.isdir(srcdir) : 
-		fatal("source directory ("+srcdir+") is not a valid directory.")
+		raise BuildSetupError("source directory ("+srcdir+") is not a valid directory.")
 
 	# Get build and install directory names
 	blddir, insdir = regression_cfg.get_bld_ins_dirname(srcri_d,bldcfg)
+	
+	# Remove existing build tree?
+	if os.path.isdir(blddir) :
+		if remove_existing_build_dir :
+			def rmtreeError(function, path, execinfo):
+				raise OSError('Cannot delete file/dir: ' + path + '. ' + execinfo)
+			try:    
+				shutil.rmtree(blddir,ignore_errors=False,onerror=rmtreeError)
+			except OSError, e: 
+				raise BuildSetupError("Could not remove the blddir ("+blddir+"). "+str(e))
 
 	# Create the build directory
 	if not os.path.isdir(blddir) :
-		try:    os.makedirs(blddir)
-		except: fatal("Could not create blddir ("+blddir+").")
+		try:    
+			os.makedirs(blddir)
+		except: 
+			raise BuildSetupError("Could not create blddir ("+blddir+").")
 
 	# Removes the old build regression information
 	ri_fn = regression_cfg.get_regression_info_fn(blddir)
 	if os.path.isfile(ri_fn):
-		try: os.remove(ri_fn)
+		try: 
+			os.remove(ri_fn)
 		except OSError, e:
-			(error('Could not remove regression information file from'+
-			       ' source directory: '+ri_fn+'('+e.output+')',2))
+			raise BuildSetupError('Could not remove regression information file from'+
+					      ' source directory: '+ri_fn+'('+e.output+')',2)
 
 	# Retrieve the cmake arguments from the build configuration.
 	cm_args_l = cfg_file.getfld(bldcfg,"cm_args_l")
@@ -87,7 +99,7 @@ def configure(srcri_d,bldcfg):
 	ri_d["bldrifn"] = ri_fn
 	cfg_file.write(ri_fn,ri_d)
 
-	return 0,ri_d
+	return ri_d
 
 def make(bldri_d,install=False):
 	blddir=cfg_file.getfld(bldri_d,"blddir")
@@ -110,15 +122,17 @@ def make(bldri_d,install=False):
 	ri_fn = cfg_file.getfld(bldri_d,"bldrifn")
 	bldri_d["bld-last-make-status"]=status
 	cfg_file.write(ri_fn,bldri_d)
-	return status
+	if status != 0 :
+		raise BuildSetupError(msg)
 
 # Main -- used for tests. The ideal usage is to import this module and use the
 # function retrieve directly.
 def usage():
-	print "\nUsage: build_setup.py -s srcdir -b bldcfg_fn [-h]\n"
+	print "\nUsage: build_setup.py -s srcdir -b bldcfg_fn [-m] [-h]\n"
 	print "\nARGUMENTS"
 	print "\t-s srcdir     : souce code directory."
 	print "\t-b bldcfg_fn  : build configuration file name."
+	print "\t-m            : execute make."
 	print "\t-h            : help ."
 	print "\nDESCRIPTION"
 	print "\tTODO....."
@@ -126,18 +140,24 @@ def usage():
 	print "\tHandle errors gracefully."
 	sys.exit(1)
 
+def error(message,exit_code):
+	sys.stderr.write('ERROR: '+message+'\n')
+	sys.exit(exit_code)
+
 if __name__ == "__main__":
 	import getopt
 	srcdir=0
 	srcbasename=0
 	srcver=0
+	makeTree=False
 	srcmodified=False
 	bldcfg_fn=0
-	opts, extra_args = getopt.getopt(sys.argv[1:], 's:b:h')
+	opts, extra_args = getopt.getopt(sys.argv[1:], 's:b:hm')
 	for f, v in opts:
 		if f   == '-s': srcdir=v
 		elif f == '-b': bldcfg_fn=v
 		elif f == '-h': usage()
+		elif f == '-m': makeTree=True
 	
 	if bldcfg_fn == 0:
 		error("An input build configuration file must be provided (-b).", 1)
@@ -148,7 +168,10 @@ if __name__ == "__main__":
 
 	srcri = cfg_file.read(srcri_fn)
 	
-	status,rid = configure(srcri,bldcfgd)
+	try:
+		rid = configure(srcri,bldcfgd)
+		if makeTree : make(rid)
+	except BuildSetupError, e:
+		error(str(e),1)
 	
-	print "STATUS : ", status
 	print "RID    : ", rid

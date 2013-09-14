@@ -23,9 +23,11 @@ import regression_cfg
 import sys
 import os.path
 
-def error(message, status):
-	sys.stderr.write('ERROR (cfg_file): '+message+'\n')
-        sys.exit(status)
+class CFGError(Exception):
+	def __init__(self, msg):
+		self.msg = msg
+	def __str__(self):
+		return self.msg
 
 # Handles configuration files
 # TODO: Improve the description...
@@ -43,7 +45,7 @@ def error(message, status):
 def read(filename):
 	# Check configuration file
 	if not os.path.isfile(filename): 
-		error(filename+' is not a valid configuration file.\n', 1)
+		raise CFGError(filename+' is not a valid configuration file.\n')
 	d={}
 	with open(filename) as f:
 		for line in f:
@@ -80,7 +82,7 @@ def write(filename,cfgd) :
 	try:
 		f = open(filename, 'w')
 	except IOError:
-		error('could not open file for writting: '+filename, 2)
+		raise CFGError('could not open file for writting: '+filename)
 	for k, v in cfgd.iteritems() :
 		if k[-2:] == "_l" : # List field
 			for i in v :
@@ -100,7 +102,7 @@ def prnt(cfgdct):
 # Get one of the fields out of a configuration dictionary
 def getfld(d,fld):
 	if fld not in d:
-		error("Configuration file does not contain field \""+fld+"\"", 1)
+		raise CFGError("Configuration file does not contain field \""+fld+"\"")
 	return d[fld]
 
 # Functions for stand alone tests
@@ -116,6 +118,9 @@ def usage():
 	print "\ta output file."
 	sys.exit(1)
 
+def error(message, status):
+	sys.stderr.write('ERROR (cfg_file): '+message+'\n')
+        sys.exit(status)
 
 # Main - for stand alone tests only
 if __name__ == "__main__":
