@@ -49,9 +49,11 @@ import subprocess
 # List of build configurations to be constructed by the performance regression
 gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-11.339-O3-PAPI-NUMA-new_skylmat" ]
 
+optimator_build_cfgs = [ "icc-12.1.3-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-12.1.3-O3-PAPI-NUMA-new_skylmat" ]
+
 macos_build_cfgs = [ "g++47-O3-vec-new_skylmat", "g++47-O3-vec" ]
 
-build_cfgs = gatzalt_build_cfgs
+build_cfgs = optimator_build_cfgs
 
 def usage():
 	print "\nUsage: ./run_regression.py [-h]\n"
