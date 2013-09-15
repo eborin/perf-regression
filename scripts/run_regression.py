@@ -47,11 +47,11 @@ import build_setup
 import subprocess
 
 # List of build configurations to be constructed by the performance regression
-gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA" ]
+gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-11.339-O3-PAPI-NUMA-new_skylmat" ]
 
 macos_build_cfgs = [ "g++47-O3-vec-new_skylmat", "g++47-O3-vec" ]
 
-build_cfgs = macos_build_cfgs
+build_cfgs = gatzalt_build_cfgs
 
 def usage():
 	print "\nUsage: ./run_regression.py [-h]\n"
@@ -123,7 +123,12 @@ if ss_status != 0 :
 
 srcbasename = srcri_d["srcbasename"]
 srcver = srcri_d["srcver"]
-log_dir=os.path.join(regression_cfg.results_dir,"r"+str(srcver))
+if srcri_d["srcmodified"] :
+	rev_dir_name = "r"+str(srcver)
+else :
+	rev_dir_name = "r"+str(srcver)+"-m"
+
+log_dir=os.path.join(regression_cfg.results_dir,rev_dir_name)
 
 regression_status = {}
 
@@ -157,8 +162,7 @@ for bldcfg_fn in build_cfgs :
 	# Creates a results_dir/revision_dir/config_dir"
 	regression_status[bldbasename]["bldbasename"] = bldbasename
 	regression_status[bldbasename]["srcbasename"] = srcbasename
-	regression_status[bldbasename]["srcver"] = srcver
-	result_dir=os.path.join(regression_cfg.results_dir,"r"+str(srcver),bldbasename)
+	result_dir=os.path.join(regression_cfg.results_dir,rev_dir_name,bldbasename)
 	if not os.path.isdir(result_dir) :
 		try:    
 			os.makedirs(result_dir)
@@ -176,7 +180,7 @@ for bldcfg_fn in build_cfgs :
 	args = [test_prg, "-r", result_dir]
 	try:
 		# Todo. Redirect stdout and stderr to an output file to keep a log.
-		log_fn=os.path.join(log_dir,bldbasename+".run.txt")
+		log_fn=os.path.join(log_dir,bldbasename+".run.log")
 		logfh = open(log_fn,mode='w+')
 		p = subprocess.Popen(args, stdout=logfh, stderr=subprocess.STDOUT, cwd=rundir)
 		p.wait()
@@ -197,7 +201,7 @@ for bldcfg_fn in build_cfgs :
 
 # Store logs.
 for b,bres in regression_status.iteritems() :
- 	fn=os.path.join(log_dir,b+".txt")
+ 	fn=os.path.join(log_dir,b+".info.cfg")
 	try:
 		cfg_file.write(fn,bres)
 	except cfg_file.CFGError, e:
