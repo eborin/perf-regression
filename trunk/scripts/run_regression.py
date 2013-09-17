@@ -49,7 +49,8 @@ import subprocess
 # List of build configurations to be constructed by the performance regression
 gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-11.339-O3-PAPI-NUMA-new_skylmat" ]
 
-optimator_build_cfgs = [ "icc-12.1.3-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-12.1.3-O3-PAPI-NUMA-new_skylmat" ]
+#optimator_build_cfgs = [ "icc-12.1.3-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-12.1.3-O3-PAPI-NUMA-new_skylmat" ]
+optimator_build_cfgs = [ "icc-12.1.3-O3", "g++-O3", "icc-12.1.3-O3-new_skylmat" ]
 
 macos_build_cfgs = [ "g++47-O3-vec-new_skylmat", "g++47-O3-vec" ]
 
@@ -125,7 +126,7 @@ if ss_status != 0 :
 
 srcbasename = srcri_d["srcbasename"]
 srcver = srcri_d["srcver"]
-if srcri_d["srcmodified"] :
+if srcri_d["srcmodified"] == "False" :
 	rev_dir_name = "r"+str(srcver)
 else :
 	rev_dir_name = "r"+str(srcver)+"-m"
@@ -164,6 +165,8 @@ for bldcfg_fn in build_cfgs :
 	# Creates a results_dir/revision_dir/config_dir"
 	regression_status[bldbasename]["bldbasename"] = bldbasename
 	regression_status[bldbasename]["srcbasename"] = srcbasename
+	regression_status[bldbasename]["srcver"] = srcver
+	regression_status[bldbasename]["srcmodified"] = srcri_d["srcmodified"]
 	result_dir=os.path.join(regression_cfg.results_dir,rev_dir_name,bldbasename)
 	if not os.path.isdir(result_dir) :
 		try:    
