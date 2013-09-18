@@ -165,16 +165,15 @@ if ss_status != 0 :
 verbose("Configuring build directory")
 try:
 	bldri_d=build_setup.configure(srcri_d,bldcfg)
-except BuildSetupError, e:
+except build_setup.BuildSetupError, e:
        	fatal("Error when configuring the build directory. "+str(e))
 
 # Make the build directory
 verbose("Building the application")
-bm_status=build_setup.make(bldri_d, True)
-
-# Check for errors
-if bm_status != 0 : 
-    fatal("Error when making the build directory build_setup.make(...) returned error code "+str(bm_status)+".")
+try:
+	build_setup.make(bldri_d, True)
+except build_setup.BuildSetupError, e:
+       	fatal("Error when building the application/library. "+str(e))
 
 # TODO handle logs
 # if(STATUS==OK)
