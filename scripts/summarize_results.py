@@ -83,12 +83,19 @@ import cfg_file
 import rdt
 import stats
 
-# Generates a list with all results, where each item is the following tuple
+default_result_dir="../results"
+default_summary_dir="./summary"
+
+# Generates:
+#  a) a list with all results, where each item is the following tuple
 #    (revN, build_cfg, scenario_name, step_name, average exec_time, conf. int)
+#  b) a dictionary that maps scenario_name to scenario info files
+#  c) a dictionary that maps build_name to build info files
 # Collect the results from results_basename directory
 def build_list(results_basename) :
 	all_results = []
 	scenarios_info = {}
+	builds_info = {}
 	dirs = {}
 	for d,subd,files in os.walk(results_basename) : 
 		dirs[d] = (subd,files)
@@ -97,8 +104,9 @@ def build_list(results_basename) :
 	for rd in rev_dirs : 
 		build_dirs = dirs[os.path.join(results_basename,rd)][0]
 		for bd in build_dirs :
-			build_info = os.path.join(results_basename,rd,bd+".info.cfg")
-			build_info_d = cfg_file.read(build_info)
+			build_info_fn = os.path.join(results_basename,rd,bd+".info.cfg")
+			build_info_d = cfg_file.read(build_info_fn)
+			builds_info[bd] = build_info_fn
 			srcver = build_info_d["srcver"]
 			scenario_dirs = dirs[os.path.join(results_basename,rd,bd)][0]
 			for sd in scenario_dirs : 
@@ -108,7 +116,8 @@ def build_list(results_basename) :
 					all_results.append((int(srcver),rd,bd,sd,sr[0:-4],os.path.join(results_basename,rd,bd,sd,sr)))
 	# Scenario descriptions
 	scenarios_desc = dict(map(lambda (k,v): (k,cfg_file.read(v)), scenarios_info.iteritems()))
-	return all_results, scenarios_desc
+	builds_desc = dict(map(lambda (k,v): (k,cfg_file.read(v)), builds_info.iteritems()))
+	return all_results, scenarios_desc, builds_desc
 
 #(4932,'r4932', 'icc-12.1.3-O3-new_skylmat', 'substruct_tst4', 'tpzdohrass', './r4932/icc-12.1.3-O3-new_skylmat/substruct_tst4/tpzdohrass.rdt')
 
@@ -145,62 +154,6 @@ def fatal(message):
 def warning(message):
 	sys.stderr.write('WARNING: '+message+'\n')
 
-# Parse arguments
-import getopt
-result_dir="../results"
-summary_dir="./summary"
-opts, extra_args = getopt.getopt(sys.argv[1:], 'r:o:h')
-for f, v in opts:
-	if f   == '-r'  : result_dir=v
-	elif f == '-o'  : summary_dir=v
-	elif f == '-h'  : usage()
-
-
-# Check result dir path
-if not os.path.isdir(result_dir): 
-	fatal("Invalid results directory path: "+result_dir)
-
-# Create the summary directory
-if not os.path.isdir(summary_dir) :
-	try:    
-		os.makedirs(summary_dir)
-	except: 
-		fatal("Error when creating the summary directory: "+summary_dir)
-		
-# Collect results
-res,sc_desc = build_list(result_dir)
-
-# Compute average and confidence intervals for each RDT file
-res = map(add_av_ci, res)
-
-#for r in res : 
-#	print r
-
-# 2) For each valid combination (scenario_name,step_name,build_cfg), it
-#    generates a list of tupples (revN, average exec_time, conf. int)
-
-step_results = {}
-for (revn,revd,bld,scn,step,rdtfn,av,ci) in res : 
-	if (scn,step,bld) in step_results :
-		step_results[(scn,step,bld)].append((revn,av,ci))
-	else :
-		step_results[(scn,step,bld)] = [(revn,av,ci)]
-
-
-for k,v in step_results.iteritems() :
-	print "=== ",k," ==="
-	for (rn,av,ci) in v : print "%6d : %12.2f +- %8.2f" % (rn,av,ci)
-
-#
-# 3) For each valid combination (scenario_name,step_name,revN), it generates a
-#    list of tupples (build_cfg, average exec_time, conf. int)
-
-
-#('r4932', 'icc-12.1.3-O3-new_skylmat', 'substruct_tst4', 'tpzdohrass', './r4932/icc-12.1.3-O3-new_skylmat/substruct_tst4/tpzdohrass.rdt')
-#    (revN, build_cfg, scenario_name, step_name, average exec_time, conf. int)
-    
-print "Done..."
-sys.exit(0)
 
 
 #
@@ -211,8 +164,6 @@ sys.exit(0)
 # 
 # For each pair (bldname,RDT result file), the script scans the set of revisions
 # looking for variations on the performance.
-  
-
 
 # results/r1/...
 #        /r2/... 
@@ -284,15 +235,124 @@ sys.exit(0)
 #  - bldcfg.id: cmake|autotools configuration short name (ex: gcc47-O3)
 
 def usage():
-	print "\nUsage: build.py -c bldcfg [-a appcfg] [-v 123] [-l logfile] [-o status]\n"
+	print "\nUsage: summarize_results.py [-r results_dir] [-o summary_dir] [-h]\n"
 	print "\nARGUMENTS"
-	print "\t-c bldcfg: a build-config file with configuration options."
-	print "\t-a appcfg: a application-config file describing the application."
-        print "\t-v version: the version of the application source code."
-        print "\t-l logfile: the filename to dump the log messages."
-        print "\t-o status: the status of the build. It can be parsed to retrieve information."
+	print "\t-r results_dir: directory containing the performance regression results. Default = "+default_result_dir
+	print "\t-o summary_dir: directory to generate the summary output files. Default = "+default_summary_dir
+        print "\t-h            : display this usage message."
 	print "\nDESCRIPTION"
-	print "\tThe build script configure, build and install an application defined "
-        print "\tby appcfg using the configuration options defined at bldcfg"
-        print "\n\tThe application use the following functions defined at the follinwg files"
+	print "\tThe summarize script summarizes the results generated by the run_regression.py script."
+	sys.exit(0)
 
+# Parse arguments
+import getopt
+result_dir=default_result_dir
+summary_dir=default_summary_dir
+opts, extra_args = getopt.getopt(sys.argv[1:], 'r:o:h')
+for f, v in opts:
+	if f   == '-r'  : result_dir=v
+	elif f == '-o'  : summary_dir=v
+	elif f == '-h'  : usage()
+
+# Check result dir path
+if not os.path.isdir(result_dir): 
+	fatal("Invalid results directory path: "+result_dir)
+
+# Create the summary directory
+if not os.path.isdir(summary_dir) :
+	try:    
+		os.makedirs(summary_dir)
+	except: 
+		fatal("Error when creating the summary directory: "+summary_dir)
+		
+# Collect results
+res,sc_desc,bd_desc = build_list(result_dir)
+
+# Compute average and confidence intervals for each RDT file
+res = map(add_av_ci, res)
+
+#for r in res : 
+#	print r
+
+# 2) For each valid combination (scenario_name,step_name,build_cfg), it
+#    generates a list of tupples (revN, average exec_time, conf. int)
+
+step_results = {}
+for (revn,revd,bld,scn,step,rdtfn,av,ci) in res : 
+	if (scn,step,bld) in step_results :
+		step_results[(scn,step,bld)].append((revn,av,ci))
+	else :
+		step_results[(scn,step,bld)] = [(revn,av,ci)]
+
+perf_stats_fn=os.path.join(summary_dir,"current_perf_status.csv")
+try:
+	f = open(perf_stats_fn, 'w')
+except IOError:
+	error('Could not open file for writting: '+perf_stats_fn)
+
+def upper_interval((revn,av,ci)) :
+	return (av+ci)
+
+def process(v) :
+	(best_res_rev,best_res_av,best_res_ci) = min(v,key=upper_interval)
+	(last_res_rev,last_res_av,last_res_ci) = (best_res_rev,best_res_av,best_res_ci)
+	for (r,a,c) in v : 
+		if r > last_res_rev : (last_res_rev,last_res_av,last_res_ci) = (r,a,c)
+	try :
+		perf_loss = ((last_res_av-last_res_ci) / (best_res_av+best_res_ci) ) - 1
+	except :
+		warning("Could not comput performance loss because best result average + ci = "+str(best_res_av+best_res_ci));
+		perf_loss = 0
+	if perf_loss < 0 : perf_loss = 0
+	return (best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss);
+
+perf_stats_list = []
+for (scn,step,bld),v in step_results.iteritems() :
+	if len(v) > 0 :
+		(best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss) = process(v)
+		perf_stats_list.append((scn,scn+".info",step,bld,bld+".info",
+				       best_res_rev,best_res_av/1000,best_res_ci/1000,
+				       last_res_rev,last_res_av/1000,last_res_ci/1000,
+				       perf_loss))
+
+def max_perf_loss_key(i) :
+	return i[11]
+
+f.write("Scenario,Scen. Desc. Filename,Step,Build,Build Desc. Filename,"+
+	"Best rev,Best rev average,Best rev conf. int.,"+
+	"Last rev,Last rev average,Last rev conf. int.,"+
+	"Performance loss\n")
+
+for (scn,scn_desc_fn,step,bld,bld_desc_fn,best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss) in sorted(perf_stats_list,key=max_perf_loss_key,reverse=True) : 
+	f.write("%s,%d,%.4f,%.4f,%d,%.4f,%.4f,%.3f\n" % 
+		(scn+","+scn_desc_fn+","+step+","+bld+","+bld_desc_fn,
+		 best_res_rev,best_res_av,best_res_ci,
+		 last_res_rev,last_res_av,last_res_ci,
+		 perf_loss))
+f.close()
+
+for scn,sc_d in sc_desc.iteritems() : 
+	scn_info_fn=os.path.join(summary_dir,scn+".info")
+	try:
+		cfg_file.write(scn_info_fn,sc_d)
+	except cfg_file.CFGError, e :
+		warning(str(e))
+
+for bdn,bd_d in bd_desc.iteritems() : 
+	bd_info_fn=os.path.join(summary_dir,bdn+".info")
+	try:
+		cfg_file.write(bd_info_fn,bd_d)
+	except cfg_file.CFGError, e :
+		warning(str(e))
+
+		
+#
+# 3) For each valid combination (scenario_name,step_name,revN), it generates a
+#    list of tupples (build_cfg, average exec_time, conf. int)
+
+
+#('r4932', 'icc-12.1.3-O3-new_skylmat', 'substruct_tst4', 'tpzdohrass', './r4932/icc-12.1.3-O3-new_skylmat/substruct_tst4/tpzdohrass.rdt')
+#    (revN, build_cfg, scenario_name, step_name, average exec_time, conf. int)
+    
+print "Done..."
+sys.exit(0)
