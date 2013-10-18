@@ -21,13 +21,13 @@
 import os.path
 import cfg_file
 
-basedir="/local/borin/perf-regression/"
+basedir="/Users/borin/Desktop/perf-regression/"
 
 results_dir=os.path.join(basedir,"results")
 regression_script_dir=os.path.join("PerfTests","scripts")
 regression_script="test.py"
 
-extra_make_args="-j 64"
+extra_make_args="-j 2"
 
 # Returns the file name of the regression configuration file. 
 def get_regression_info_fn(directory):
