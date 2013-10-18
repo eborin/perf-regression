@@ -50,8 +50,7 @@ import shutil # copy2
 # List of build configurations to be constructed by the performance regression
 gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-11.339-O3-PAPI-NUMA-new_skylmat" ]
 
-#optimator_build_cfgs = [ "icc-12.1.3-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-12.1.3-O3-PAPI-NUMA-new_skylmat" ]
-optimator_build_cfgs = [ "icc-12.1.3-O3", "g++-O3", "icc-12.1.3-O3-new_skylmat" ]
+optimator_build_cfgs = [ "icc-12.1.3-O3-NUMA", "icc-12.1.3-O3", "g++-O3", "icc-12.1.3-O3-new_skylmat" ]
 
 macos_build_cfgs = [ "g++47-O3-vec-new_skylmat", "g++47-O3-vec" ]
 
@@ -102,7 +101,7 @@ def warning(message):
 # Parse arguments
 import getopt
 appcfg_fn="neopz" # default name
-version=0
+version=-1
 statusf=0
 logf=0
 custom_cfgs = [ ]
@@ -127,12 +126,19 @@ if ss_status != 0 :
 
 srcbasename = srcri_d["srcbasename"]
 srcver = srcri_d["srcver"]
-if srcri_d["srcmodified"] == "False" :
-	rev_dir_name = "r"+str(srcver)
-else :
+srcmodified_str = srcri_d["srcmodified"]
+srcmodified = (srcmodified_str != 'False')
+
+if srcmodified :
 	rev_dir_name = "r"+str(srcver)+"-m"
+else :
+	rev_dir_name = "r"+str(srcver)
 
 log_dir=os.path.join(regression_cfg.results_dir,rev_dir_name)
+
+if os.path.isdir(log_dir) :
+        warning("Regression for revision "+str(srcver)+" already executed at \""+log_dir+"\". Nothing to do...")
+        sys.exit(0)
 
 regression_status = {}
 
