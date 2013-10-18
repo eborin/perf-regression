@@ -18,16 +18,28 @@
 #*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
 #**************************************************************************/
 
+# Set the performance regression base directory
+basedir="/Users/borin/Desktop/perf-regression/"
+
 import os.path
 import cfg_file
 
-basedir="/Users/borin/Desktop/perf-regression/"
+# Figure out the number of cores (to improve compilation speed)
+try: 
+	import multiprocessing
+        ncores = multiprocessing.cpu_count()
+except ImportError, e:
+	print "WARNING: could not import multiprocessing module. Setting ncores = 1"
+	ncores = 1
+except NotImplementedError, e:
+	print "WARNING: multiprocessing.cpu_count() not implemented. Setting ncores = 1"
+	ncores = 1
 
 results_dir=os.path.join(basedir,"results")
 regression_script_dir=os.path.join("PerfTests","scripts")
 regression_script="test.py"
 
-extra_make_args="-j 2"
+extra_make_args="-j "+str(ncores)
 
 # Returns the file name of the regression configuration file. 
 def get_regression_info_fn(directory):

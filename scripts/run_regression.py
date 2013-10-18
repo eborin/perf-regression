@@ -182,7 +182,7 @@ for bldcfg_fn in build_cfgs :
 		continue # Next building tree
 	regression_status[bldbasename]["config_status"]="Ok"
 	try:
-		verbose("Building the application")
+		verbose("Making the build directory.")
 		build_setup.make(bldri_d)
 	except build_setup.MakeSetupError, e:
 		warning(str(e))
@@ -203,6 +203,7 @@ for bldcfg_fn in build_cfgs :
 	test_prg = os.path.join(rundir,regression_cfg.regression_script)
 	args = [test_prg, "-r", result_dir]
 	try:
+		verbose("Running the performance regression script")
 		# Todo. Redirect stdout and stderr to an output file to keep a log.
 		log_fn=os.path.join(log_dir,bldbasename+".run.log")
 		logfh = open(log_fn,mode='w+')
@@ -224,6 +225,7 @@ for bldcfg_fn in build_cfgs :
 	regression_status[bldbasename]["status"]="Ok"
 
 # Store logs.
+verbose("Storing log files")
 for b,bres in regression_status.iteritems() :
  	fn=os.path.join(log_dir,b+".info.cfg")
 	try:
