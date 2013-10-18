@@ -49,6 +49,10 @@
 # 
 # CSV file with the following information
 # scenario_name, scenario_desc_fn, step_name, bldbasename, bld_desc_fn, best_result_rev, cur_rev, best_result, current_result, perf_loss
+
+#Scenario,Scen. Desc. Filename,Step,Build,Build Desc. Filename,Best rev,Best rev average,Best rev conf. int.,Last Working rev,Last Working rev average,Last Working rev conf. int.,Performance loss,Last Revision Status
+
+# scenario_name, scenario_desc_fn, step_name, bldbasename, bld_desc_fn, best_result_rev, cur_rev, best_result, current_result, perf_loss
 #
 # * scenario_desc_fn and bld_desc_fn contain the name of the files that
 #   describes the scenario and the build configurations, respectively.
@@ -106,7 +110,8 @@ def build_list(results_basename) :
 		for bd in build_dirs :
 			build_info_fn = os.path.join(results_basename,rd,bd+".info.cfg")
 			build_info_d = cfg_file.read(build_info_fn)
-			builds_info[bd] = build_info_fn
+			if bd in builds_info : builds_info[bd].append(build_info_fn)
+			else: builds_info[bd] = [ build_info_fn ]
 			srcver = build_info_d["srcver"]
 			scenario_dirs = dirs[os.path.join(results_basename,rd,bd)][0]
 			for sd in scenario_dirs : 
@@ -116,7 +121,7 @@ def build_list(results_basename) :
 					all_results.append((int(srcver),rd,bd,sd,sr[0:-4],os.path.join(results_basename,rd,bd,sd,sr)))
 	# Scenario descriptions
 	scenarios_desc = dict(map(lambda (k,v): (k,cfg_file.read(v)), scenarios_info.iteritems()))
-	builds_desc = dict(map(lambda (k,v): (k,cfg_file.read(v)), builds_info.iteritems()))
+	builds_desc = dict(map(lambda (k,v): (k,map(lambda (lit): cfg_file.read(lit),v)), builds_info.iteritems()))
 	return all_results, scenarios_desc, builds_desc
 
 #(4932,'r4932', 'icc-12.1.3-O3-new_skylmat', 'substruct_tst4', 'tpzdohrass', './r4932/icc-12.1.3-O3-new_skylmat/substruct_tst4/tpzdohrass.rdt')
@@ -295,24 +300,24 @@ def upper_interval((revn,av,ci)) :
 
 def process(v) :
 	(best_res_rev,best_res_av,best_res_ci) = min(v,key=upper_interval)
-	(last_res_rev,last_res_av,last_res_ci) = (best_res_rev,best_res_av,best_res_ci)
+	(last_w_res_rev,last_w_res_av,last_w_res_ci) = (best_res_rev,best_res_av,best_res_ci)
 	for (r,a,c) in v : 
-		if r > last_res_rev : (last_res_rev,last_res_av,last_res_ci) = (r,a,c)
+		if r > last_w_res_rev : (last_w_res_rev,last_w_res_av,last_w_res_ci) = (r,a,c)
 	try :
-		perf_loss = ((last_res_av-last_res_ci) / (best_res_av+best_res_ci) ) - 1
+		perf_loss = ((last_w_res_av-last_w_res_ci) / (best_res_av+best_res_ci) ) - 1
 	except :
 		warning("Could not comput performance loss because best result average + ci = "+str(best_res_av+best_res_ci));
 		perf_loss = 0
 	if perf_loss < 0 : perf_loss = 0
-	return (best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss);
+	return (best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss);
 
 perf_stats_list = []
 for (scn,step,bld),v in step_results.iteritems() :
 	if len(v) > 0 :
-		(best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss) = process(v)
+		(best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss) = process(v)
 		perf_stats_list.append((scn,scn+".info",step,bld,bld+".info",
 				       best_res_rev,best_res_av/1000,best_res_ci/1000,
-				       last_res_rev,last_res_av/1000,last_res_ci/1000,
+				       last_w_res_rev,last_w_res_av/1000,last_w_res_ci/1000,
 				       perf_loss))
 
 def max_perf_loss_key(i) :
@@ -320,14 +325,14 @@ def max_perf_loss_key(i) :
 
 f.write("Scenario,Scen. Desc. Filename,Step,Build,Build Desc. Filename,"+
 	"Best rev,Best rev average,Best rev conf. int.,"+
-	"Last rev,Last rev average,Last rev conf. int.,"+
-	"Performance loss\n")
+	"Last Working rev,Last Working rev average,Last Working rev conf. int.,"+
+	"Performance loss, Last rev, Last revision status\n")
 
-for (scn,scn_desc_fn,step,bld,bld_desc_fn,best_res_rev,best_res_av,best_res_ci,last_res_rev,last_res_av,last_res_ci,perf_loss) in sorted(perf_stats_list,key=max_perf_loss_key,reverse=True) : 
+for (scn,scn_desc_fn,step,bld,bld_desc_fn,best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss) in sorted(perf_stats_list,key=max_perf_loss_key,reverse=True) : 
 	f.write("%s,%d,%.4f,%.4f,%d,%.4f,%.4f,%.3f\n" % 
 		(scn+","+scn_desc_fn+","+step+","+bld+","+bld_desc_fn,
 		 best_res_rev,best_res_av,best_res_ci,
-		 last_res_rev,last_res_av,last_res_ci,
+		 last_w_res_rev,last_w_res_av,last_w_res_ci,
 		 perf_loss))
 f.close()
 
@@ -338,12 +343,24 @@ for scn,sc_d in sc_desc.iteritems() :
 	except cfg_file.CFGError, e :
 		warning(str(e))
 
+# For each build configuration, write a csv file (*.build_run_status.csv)
+# containing the build and run status for each source code revision
 for bdn,bd_d in bd_desc.iteritems() : 
-	bd_info_fn=os.path.join(summary_dir,bdn+".info")
+	bd_info_fn=os.path.join(summary_dir,bdn+".build_run_status.csv")
 	try:
-		cfg_file.write(bd_info_fn,bd_d)
-	except cfg_file.CFGError, e :
-		warning(str(e))
+		f = open(bd_info_fn, 'w')
+		f.write("revision,build_status,run_status\n")
+		for i in bd_d : 
+			try:
+				rev=cfg_file.getfld(i,"srcver")
+				bdst=cfg_file.getfld(i,"build_status")
+				runst=cfg_file.getfld(i,"run_status")
+				f.write(str(rev)+","+str(bdst)+","+str(runst)+"\n");
+			except cfg.CFGError, e:
+				warning(str(e))
+				
+	except IOError:
+		raise CFGError('could not open file for writting: '+filename)
 
 		
 #

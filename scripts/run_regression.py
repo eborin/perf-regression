@@ -45,6 +45,7 @@ import system_env
 import os.path
 import build_setup
 import subprocess
+import shutil # copy2
 
 # List of build configurations to be constructed by the performance regression
 gatzalt_build_cfgs = [ "icc-11.339-O3-PAPI-NUMA", "g++-O3-PAPI-NUMA", "icc-11.339-O3-PAPI-NUMA-new_skylmat" ]
@@ -147,21 +148,6 @@ for bldcfg_fn in build_cfgs :
 
 	regression_status[bldbasename] = {}
 
-	try:
-		verbose("Configuring build directory for: "+bldbasename)
-		bldri_d=build_setup.configure(srcri_d,bldcfg,remove_existing_build_dir=True)
-		verbose("Building the application")
-		build_setup.make(bldri_d)
-	except build_setup.BuildSetupError, e:
-		warning(str(e))
-		regression_status[bldbasename]["status"]="Error"
-		regression_status[bldbasename]["build_status"]="Error"
-		regression_status[bldbasename]["build_err_msg"]=str(e)
-		continue # Next building tree
-
-	# Ok, the configuration and build where done ok.
-	regression_status[bldbasename]["build_status"]="Ok"
-
 	# Creates a results_dir/revision_dir/config_dir"
 	regression_status[bldbasename]["bldbasename"] = bldbasename
 	regression_status[bldbasename]["srcbasename"] = srcbasename
@@ -176,8 +162,41 @@ for bldcfg_fn in build_cfgs :
 			regression_status[bldbasename]["status"]="Error"
 			regression_status[bldbasename]["err_msg"]="Could not create the result dir. "+str(e)
 			continue
+
+	# Copy build configuration file () to results dir.
+	# os.path.join(regression_cfg.basedir,"cfg","build",bldcfg_fn+".cfg") => os.path.join(regression_cfg.results_dir,rev_dir_name,basename=".cfg")
+	shutil.copy2(os.path.join(regression_cfg.basedir,"cfg","build",bldcfg_fn+".cfg"),
+		     os.path.join(regression_cfg.results_dir,rev_dir_name,bldbasename+".cfg"))
+
+	# Configure and make the build configuration
+	try:
+		verbose("Configuring build directory for: "+bldbasename)
+		bldri_d=build_setup.configure(srcri_d,bldcfg,remove_existing_build_dir=True)
+	except build_setup.ConfigureSetupError, e:
+		warning(str(e))
+		regression_status[bldbasename]["status"]="Error"
+		regression_status[bldbasename]["build_status"]="Error"
+		regression_status[bldbasename]["build_err_msg"]="Configuration error. "+str(e)
+		regression_status[bldbasename]["config_status"]="Error"
+		regression_status[bldbasename]["make_status"]="Error"
+		continue # Next building tree
+	regression_status[bldbasename]["config_status"]="Ok"
+	try:
+		verbose("Building the application")
+		build_setup.make(bldri_d)
+	except build_setup.MakeSetupError, e:
+		warning(str(e))
+		regression_status[bldbasename]["status"]="Error"
+		regression_status[bldbasename]["build_status"]="Error"
+		regression_status[bldbasename]["build_err_msg"]="Make error. "+str(e)
+		regression_status[bldbasename]["make_status"]="Error"
+		continue # Next building tree
+	regression_status[bldbasename]["make_status"]="Ok"
+
+	# The configuration and make where done ok.
+	regression_status[bldbasename]["build_status"]="Ok"
 	
-	# calls build_dir/regression_script_dir/regression_scrip -r results_dir/revision/config_dir"
+	# calls build_dir/regression_script_dir/regression_script -r results_dir/revision/config_dir"
 	# The regression_script script is responsible for running, checking and moving the"
 	# results to result_dir"  
 	rundir   = os.path.join(bldri_d["blddir"],regression_cfg.regression_script_dir)

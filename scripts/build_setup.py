@@ -25,9 +25,16 @@ import shutil
 import cfg_file
 import subprocess as sp
 
-class BuildSetupError(Exception):
+class ConfigureSetupError(Exception):
 	def __init__(self, msg):
 		self.msg = msg
+	def __str__(self):
+		return self.msg
+
+class MakeSetupError(Exception):
+	def __init__(self, s_msg, l_msg):
+		self.msg = s_msg
+		self.long_msg = l_msg
 	def __str__(self):
 		return self.msg
 
@@ -39,7 +46,7 @@ def configure(srcri_d,bldcfg,remove_existing_build_dir=False):
 	# Check src directories
 	srcdir=cfg_file.getfld(srcri_d,"srcdir")
 	if not os.path.isdir(srcdir) : 
-		raise BuildSetupError("source directory ("+srcdir+") is not a valid directory.")
+		raise ConfigureSetupError("source directory ("+srcdir+") is not a valid directory.")
 
 	# Get build and install directory names
 	blddir, insdir = regression_cfg.get_bld_ins_dirname(srcri_d,bldcfg)
@@ -52,14 +59,14 @@ def configure(srcri_d,bldcfg,remove_existing_build_dir=False):
 			try:    
 				shutil.rmtree(blddir,ignore_errors=False,onerror=rmtreeError)
 			except OSError, e: 
-				raise BuildSetupError("Could not remove the blddir ("+blddir+"). "+str(e))
+				raise ConfigureSetupError("Could not remove the blddir ("+blddir+"). "+str(e))
 
 	# Create the build directory
 	if not os.path.isdir(blddir) :
 		try:    
 			os.makedirs(blddir)
 		except: 
-			raise BuildSetupError("Could not create blddir ("+blddir+").")
+			raise ConfigureSetupError("Could not create blddir ("+blddir+").")
 
 	# Removes the old build regression information
 	ri_fn = regression_cfg.get_regression_info_fn(blddir)
@@ -67,8 +74,8 @@ def configure(srcri_d,bldcfg,remove_existing_build_dir=False):
 		try: 
 			os.remove(ri_fn)
 		except OSError, e:
-			raise BuildSetupError('Could not remove regression information file from'+
-					      ' source directory: '+ri_fn+'('+e.output+')',2)
+			raise ConfigureSetupError('Could not remove regression information file from'+
+						  ' source directory: '+ri_fn+'('+e.output+')',2)
 
 	# Retrieve the cmake arguments from the build configuration.
 	cm_args_l = cfg_file.getfld(bldcfg,"cm_args_l")
@@ -113,9 +120,12 @@ def make(bldri_d,install=False):
 		logf.close()
 		status = 0
 	except sp.CalledProcessError, e:
-		msg='"Error when trying to make the build using make: '+e.output
-		logf.write('WARNING:\n'+msg)
-		warn(msg)
+		short_msg='Error when trying to construct the software using make.'
+		long_msg=e.output
+		logf.write('WARNING:\n'+short_msg)
+		logf.write('WARNING:\n'+long_msg)
+		warn(short_msg)
+		warn(long_msg)
 		logf.close()
 		status = 1
 	# Update the build regression info
@@ -123,7 +133,7 @@ def make(bldri_d,install=False):
 	bldri_d["bld-last-make-status"]=status
 	cfg_file.write(ri_fn,bldri_d)
 	if status != 0 :
-		raise BuildSetupError(msg)
+		raise MakeSetupError(short_msg,long_msg)
 
 # Main -- used for tests. The ideal usage is to import this module and use the
 # function retrieve directly.
@@ -171,7 +181,9 @@ if __name__ == "__main__":
 	try:
 		rid = configure(srcri,bldcfgd)
 		if makeTree : make(rid)
-	except BuildSetupError, e:
+	except ConfigureSetupError, e:
 		error(str(e),1)
+	except MakeSetupError, e:
+		error(str(e)+e.long_msg,1)
 	
 	print "RID    : ", rid
