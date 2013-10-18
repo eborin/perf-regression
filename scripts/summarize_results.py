@@ -289,6 +289,21 @@ for (revn,revd,bld,scn,step,rdtfn,av,ci) in res :
 	else :
 		step_results[(scn,step,bld)] = [(revn,av,ci)]
 
+
+# Write performance per scenario
+for (scn,step,bld),v in step_results.iteritems() :
+	fn=os.path.join(summary_dir,str(bld)+"."+str(scn)+"."+str(step)+".csv")
+	try :
+		f = open(fn,'w')
+		f.write("Revision,Average,Conf. Interval\n")
+		for (revn,av,ci) in sorted(v,key=lambda(r,a,c) : r) :
+			f.write(str(revn)+","+str(av)+","+str(ci)+"\n")
+		f.close()
+	except:
+		print "WARNING: could not write results to file "+fn
+
+
+# Write perf stats
 perf_stats_fn=os.path.join(summary_dir,"current_perf_status.csv")
 try:
 	f = open(perf_stats_fn, 'w')
