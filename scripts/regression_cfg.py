@@ -19,7 +19,7 @@
 #**************************************************************************/
 
 # Set the performance regression base directory
-basedir="/Users/borin/Desktop/perf-regression/"
+basedir="/local/regression/perf-regression/"
 
 import os.path
 import cfg_file
@@ -51,7 +51,8 @@ def get_app_dirname(appcfgd):
 
 def get_bld_ins_dirname(srccfgd,bldcfgd):
 	srcbasename = cfg_file.getfld(srccfgd,"srcbasename")
-        srcmodified = cfg_file.getfld(srccfgd,"srcmodified")
+        srcmodified_str = cfg_file.getfld(srccfgd,"srcmodified")
+	srcmodified = (srcmodified_str != "False")
         srcver = cfg_file.getfld(srccfgd,"srcver")
         bldbasename = cfg_file.getfld(bldcfgd,"bldbasename")
 	basename=srcbasename+"-"+bldbasename+"-v"+str(srcver)

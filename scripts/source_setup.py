@@ -63,7 +63,8 @@ def retrieve(appcfg,version):
 	# Removes the old source regression information
 	ri_fn = regression_cfg.get_regression_info_fn(srcdir)
 	if os.path.isfile(ri_fn):
-		try: os.remove(ri_fn)
+		try: 
+			os.remove(ri_fn)
 		except OSError, e:
 			(error('Could not remove regression information file from'+
 			       ' source directory: '+ri_fn+'('+e.output+')',2))
@@ -85,17 +86,17 @@ def retrieve(appcfg,version):
 				rev = client.checkout(rep_addr,srcdir)
 		except pysvn.ClientError, e:
 			error("Could not checkout source from repository: "+rep_addr+". ERR("+str(e)+")",2)
-		srcmodified=False
+		srcmodified="False"
 	else:
 		# Source dir exists. Retrieve info from the current copy
 		entry   = client.info(srcdir)
 		# Check for local changes
 		changes = client.status(srcdir)
-		srcmodified=False
+		srcmodified="False"
 		localcopychanges=""
 		for f in changes: 
-			if f.text_status != pysvn.wc_status_kind.normal : 
-				srcmodified = True 
+			if f.text_status != pysvn.wc_status_kind.normal and f.text_status != pysvn.wc_status_kind.ignored : 
+				srcmodified = "True" 
 				# Store modified files for eventual logging.
 				localcopychanges+=('['+str(f.text_status)+']:['+f.path+']\n')
 				#print (f.path,f.text_status)
@@ -106,7 +107,7 @@ def retrieve(appcfg,version):
 				rev=pysvn.Revision(pysvn.opt_revision_kind.number, version)
 			else : # Last revision
 				rev=pysvn.Revision(pysvn.opt_revision_kind.head)
-			if not srcmodified :
+			if srcmodified == "False" :
 				rep_addr = cfg_file.getfld(appcfg,"rep_address")
 				# Change to version. 
 				try: 
