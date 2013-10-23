@@ -371,7 +371,7 @@ for bdn,bd_d in bd_desc.iteritems() :
 				bdst=cfg_file.getfld(i,"build_status")
 				runst=cfg_file.getfld(i,"run_status")
 				f.write(str(rev)+","+str(bdst)+","+str(runst)+"\n");
-			except cfg.CFGError, e:
+			except cfg_file.CFGError, e:
 				warning(str(e))
 				
 	except IOError:
