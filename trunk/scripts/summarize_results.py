@@ -109,7 +109,11 @@ def build_list(results_basename) :
 		build_dirs = dirs[os.path.join(results_basename,rd)][0]
 		for bd in build_dirs :
 			build_info_fn = os.path.join(results_basename,rd,bd+".info.cfg")
-			build_info_d = cfg_file.read(build_info_fn)
+			try:
+				build_info_d = cfg_file.read(build_info_fn)
+			except cfg_file.CFGError, e:
+				print "WARNING: could not read file "+build_info_fn+" (", e, ")"
+				continue
 			if bd in builds_info : builds_info[bd].append(build_info_fn)
 			else: builds_info[bd] = [ build_info_fn ]
 			srcver = build_info_d["srcver"]
@@ -131,10 +135,15 @@ def add_av_ci((revn,revd,bld,scn,step,rdtfn)) :
 	try: 
 		rdt_d=rdt.read(rdtfn)
 		elapsed_list=rdt.get_column_values(rdt_d,"ELAPSED")
+		user_list=rdt.get_column_values(rdt_d,"SELF_RU_UTIME")
 		try:
 			av=stats.average(elapsed_list)
 		except stats.StatsError, e:
 			av=0.0
+		try:
+			usr_av=stats.average(user_list)
+		except stats.StatsError, e:
+			usr_av=0.0
 		try:
 			ci=stats.conf_int(elapsed_list, 95.0)
 		except stats.StatsError, e:
@@ -143,7 +152,8 @@ def add_av_ci((revn,revd,bld,scn,step,rdtfn)) :
 		print "WARNING: error when summarizing results for", fn, "(", e, ")"
 		av=0.0
 		ci=0.0
-	return (revn,revd,bld,scn,step,rdtfn,av,ci) 
+		usr_av=0.0
+	return (revn,revd,bld,scn,step,rdtfn,av,ci,usr_av) 
 	
 def verbose(msg):
 	print msg
@@ -283,11 +293,11 @@ res = map(add_av_ci, res)
 #    generates a list of tupples (revN, average exec_time, conf. int)
 
 step_results = {}
-for (revn,revd,bld,scn,step,rdtfn,av,ci) in res : 
+for (revn,revd,bld,scn,step,rdtfn,av,ci,usr_av) in res : 
 	if (scn,step,bld) in step_results :
-		step_results[(scn,step,bld)].append((revn,av,ci))
+		step_results[(scn,step,bld)].append((revn,av,ci,usr_av))
 	else :
-		step_results[(scn,step,bld)] = [(revn,av,ci)]
+		step_results[(scn,step,bld)] = [(revn,av,ci,usr_av)]
 
 
 # Write performance per scenario
@@ -296,7 +306,7 @@ for (scn,step,bld),v in step_results.iteritems() :
 	try :
 		f = open(fn,'w')
 		f.write("Revision,Average,Conf. Interval\n")
-		for (revn,av,ci) in sorted(v,key=lambda(r,a,c) : r) :
+		for (revn,av,ci,usr_av) in sorted(v,key=lambda(r,a,c,u) : r) :
 			f.write(str(revn)+","+str(av)+","+str(ci)+"\n")
 		f.close()
 	except:
@@ -310,45 +320,55 @@ try:
 except IOError:
 	error('Could not open file for writting: '+perf_stats_fn)
 
-def upper_interval((revn,av,ci)) :
+def upper_interval((revn,av,ci,usr_av)) :
 	return (av+ci)
 
 def process(v) :
-	(best_res_rev,best_res_av,best_res_ci) = min(v,key=upper_interval)
-	(last_w_res_rev,last_w_res_av,last_w_res_ci) = (best_res_rev,best_res_av,best_res_ci)
-	for (r,a,c) in v : 
-		if r > last_w_res_rev : (last_w_res_rev,last_w_res_av,last_w_res_ci) = (r,a,c)
+	(best_res_rev,best_res_av,best_res_ci,best_res_usr_av) = min(v,key=upper_interval)
+	(last_w_res_rev,last_w_res_av,last_w_res_ci,last_w_res_usr_av) = (best_res_rev,best_res_av,best_res_ci,best_res_usr_av)
+	for (r,a,c,u) in v : 
+		if r > last_w_res_rev : (last_w_res_rev,last_w_res_av,last_w_res_ci,last_w_res_usr_av) = (r,a,c,u)
 	try :
-		perf_loss = ((last_w_res_av-last_w_res_ci) / (best_res_av+best_res_ci) ) - 1
+		perf_loss = ((last_w_res_av-last_w_res_ci) / (best_res_av+best_res_ci) ) 
 	except :
 		warning("Could not comput performance loss because best result average + ci = "+str(best_res_av+best_res_ci));
 		perf_loss = 0
-	if perf_loss < 0 : perf_loss = 0
-	return (best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss);
+	if perf_loss < 1.0 : perf_loss = 1.0
+	return (best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,last_w_res_usr_av,perf_loss);
 
 perf_stats_list = []
 for (scn,step,bld),v in step_results.iteritems() :
 	if len(v) > 0 :
-		(best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss) = process(v)
+		(best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,last_w_res_usr_av,perf_loss) = process(v)
+		try:
+			usr_wall=last_w_res_usr_av/last_w_res_av
+		except:
+			usr_wall=-1.0
 		perf_stats_list.append((scn,scn+".info",step,bld,bld+".info",
 				       best_res_rev,best_res_av/1000,best_res_ci/1000,
-				       last_w_res_rev,last_w_res_av/1000,last_w_res_ci/1000,
+				       last_w_res_rev,last_w_res_av/1000,last_w_res_ci/1000, usr_wall,
 				       perf_loss))
 
 def max_perf_loss_key(i) :
 	return i[11]
 
-f.write("Scenario,Scen. Desc. Filename,Step,Build,Build Desc. Filename,"+
+f.write("Step / Scenario,Scen. Desc. Filename,Build,Build Desc. Filename,"+
 	"Best rev,Best rev average,Best rev conf. int.,"+
 	"Last Working rev,Last Working rev average,Last Working rev conf. int.,"+
-	"Performance loss, Last rev, Last revision status\n")
+	"Performance loss,User/Wall,Scenario Description\n") #, Last rev, Last revision status\n")
 
-for (scn,scn_desc_fn,step,bld,bld_desc_fn,best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,perf_loss) in sorted(perf_stats_list,key=max_perf_loss_key,reverse=True) : 
-	f.write("%s,%d,%.4f,%.4f,%d,%.4f,%.4f,%.3f\n" % 
-		(scn+","+scn_desc_fn+","+step+","+bld+","+bld_desc_fn,
+for (scn,scn_desc_fn,step,bld,bld_desc_fn,best_res_rev,best_res_av,best_res_ci,last_w_res_rev,last_w_res_av,last_w_res_ci,last_w_res_user_wall,perf_loss) in sorted(perf_stats_list,key=max_perf_loss_key,reverse=True) : 
+	try:
+		scn_desc_d=sc_desc[scn]
+		desc=cfg_file.getfld(scn_desc_d,"test_desc")
+	except cfg_file.CFGError, e:
+		print "WARNING: "+str(e)
+		desc="???"
+	f.write("%s,%d,%.4f,%.4f,%d,%.4f,%.4f,%.3f,%.4f,%s\n" % 
+		(step+" / "+scn+","+scn_desc_fn+","+bld+","+bld_desc_fn,
 		 best_res_rev,best_res_av,best_res_ci,
 		 last_w_res_rev,last_w_res_av,last_w_res_ci,
-		 perf_loss))
+		 perf_loss,last_w_res_user_wall,desc))
 f.close()
 
 for scn,sc_d in sc_desc.iteritems() : 
